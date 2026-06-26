@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local runtime data store (reseeded on run) + local launch config
+/.data/
+/.claude/
