@@ -3,6 +3,7 @@
 // server actions never touch the storage mechanism directly. See db/schema.sql
 // for the equivalent Postgres tables and README "Going to production".
 import fs from "fs";
+import os from "os";
 import path from "path";
 import type {
   Booking,
@@ -17,34 +18,52 @@ import type {
 } from "./types";
 import { freshSeed } from "./seed";
 
-const DATA_DIR = path.join(process.cwd(), ".data");
+// Storage is an in-memory cache (the source of truth at runtime) with best-effort
+// persistence to a writable dir. On Vercel/serverless the project dir is read-only,
+// so we persist to the OS temp dir and never crash if even that is unavailable —
+// the in-memory cache still serves the request. Data is per-instance and resets on
+// a cold start; for durable, shared data use Supabase (see db/schema.sql + README).
+const DATA_DIR = process.env.VERCEL
+  ? path.join(os.tmpdir(), "hearth")
+  : path.join(process.cwd(), ".data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
 
-function read(): DB {
+let cache: DB | null = null;
+
+function load(): DB {
+  if (cache) return cache;
   try {
-    const raw = fs.readFileSync(DB_FILE, "utf8");
-    return JSON.parse(raw) as DB;
+    cache = JSON.parse(fs.readFileSync(DB_FILE, "utf8")) as DB;
   } catch {
-    const seeded = freshSeed();
-    write(seeded);
-    return seeded;
+    cache = freshSeed();
+    persist();
+  }
+  return cache;
+}
+
+function persist(): void {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(DB_FILE, JSON.stringify(cache, null, 2), "utf8");
+  } catch {
+    // read-only filesystem (some serverless runtimes) — in-memory cache is enough
   }
 }
 
-function write(db: DB): void {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+function read(): DB {
+  return load();
 }
 
 function mutate<T>(fn: (db: DB) => T): T {
-  const db = read();
+  const db = load();
   const result = fn(db);
-  write(db);
+  persist();
   return result;
 }
 
 export function resetStore(): void {
-  write(freshSeed());
+  cache = freshSeed();
+  persist();
 }
 
 // ---- Reads -----------------------------------------------------------------

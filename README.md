@@ -29,6 +29,24 @@ three personas — this is the demo stand-in for Supabase Auth:
 | **Chef** (Ana Reyes) | a supplier | Dashboard, requests inbox, menus, earnings/payouts |
 | **Admin** (Hearth ops) | us | Approval queue, bookings table, GMV dashboard, refunds |
 
+## Deploy to Vercel
+
+The app is Vercel-ready — push to GitHub and **Import** the repo at
+[vercel.com/new](https://vercel.com/new) (Vercel auto-detects Next.js; no config
+needed), or:
+
+```bash
+npm i -g vercel
+vercel          # preview deploy
+vercel --prod   # production deploy
+```
+
+> **Data note:** there's no external database. The store keeps data in memory with
+> best-effort persistence to the serverless temp dir, so on Vercel the seeded data
+> is **per-instance and resets on a cold start** (and isn't shared across instances).
+> That's fine for a demo. For durable, shared data, point `src/lib/store.ts` at
+> Supabase using `db/schema.sql` (see "Going to production" below).
+
 ## What's built (maps to the plan)
 
 The full **core loop** from doc 02 works end-to-end:
